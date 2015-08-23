@@ -6,21 +6,22 @@
 #include <sys/types.h>
 #include <sys/epoll.h>
 #include <arpa/inet.h>
-#include "server.h"
-#define BUFF_SIZE 1024
+//#include "server.h"
+#define BUFF_SIZE 256
+#define _cd "cd "
+#define  _ls "ls"
+#define _pwd "pwd"
+#define _cat "cat "
+
+int execute_command(char *,int);
 
 int main(int argc, const char *argv[])
 {
-	connected_users=0;
+	
 	int user_number=0;
-	user_number=atoi(argv[1]);
-	//printf("%i\n",user_number);
-	users_list=construct(user_number);
 	int i = 0;
 	char buff[BUFF_SIZE];
-	//memset(buff,0,BUFF_SIZE);
-	ssize_t msg_len = 0;
-	ssize_t res_len = 0;
+	memset(buff,0,BUFF_SIZE);
 	int srv_fd = -1;
 	int cli_fd = -1;
 	int epoll_fd = -1;
@@ -113,20 +114,17 @@ int main(int argc, const char *argv[])
 				}
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
-					read(cli_fd, &msg_len, sizeof(msg_len));
-					readb=read(cli_fd, buff, msg_len);
-					printf("Odczytane dane : %zu\n",msg_len);
+					//read(cli_fd, &msg_len, sizeof(msg_len));
+					readb=read(cli_fd, buff,sizeof(buff)-1 );
+					printf("Odczytiane dane : %zu %zu\n",sizeof(buff),readb);
 
 					if (readb > 0) {
-						respond(cli_fd,buff);
-						res_len=strlen(buff);
-						write(cli_fd, &res_len, sizeof(res_len));
-						write(cli_fd, buff, res_len);
-						memset(buff,0,BUFF_SIZE);
+						execute_command(buff,cli_fd);	
 						printf("Wyslano wiadomosc\n");
-
+                                         	//bzero(&response_buff,strlen(response_buff));
 					}
-					
+				
+					bzero(buff,readb);
 				}
 				else {
                                         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
@@ -136,7 +134,49 @@ int main(int argc, const char *argv[])
 		}
 	}
 
-	clear(users_list);
+
 	return 0;
 }
+
+
+int execute_command(char * command,int fd){
+
+  if(!strncmp(command,_cd,strlen(_cd))){
+	chdir(command+strlen(_cd));
+	char x[BUFF_SIZE];
+	getcwd(x,BUFF_SIZE);
+	send(fd,x,strlen(x),0);
+	return 0;
+
+  }
+
+
+  FILE *fp;
+  static char buffer[]="";
+  char temp[128];
+  bzero(temp,128);
+  bzero(buffer,BUFF_SIZE);
+  /* Open the command for reading. */
+  fp = popen(command, "r");
+  if (fp == NULL) {
+    printf("Failed to run command\n" );
+    exit(1);
+  }
+
+  /* Read the output a line at a time - output it. */
+  while (fgets(temp, sizeof(temp)-1, fp) != NULL) {
+	strcat(buffer,temp);
+	
+  }
+        pclose(fp);
+	if(fd>0)
+  	send(fd,buffer,strlen(buffer),0);
+	
+
+
+}
+
+
+
+
 

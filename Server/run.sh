@@ -1,5 +1,5 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./libserver/build
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./src
 
-./prog 1
+./server 1

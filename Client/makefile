@@ -1,3 +1,4 @@
+CFLAGS=-g
 LDFLAGS =
 SOURCES = src/client.c
 NAME = client

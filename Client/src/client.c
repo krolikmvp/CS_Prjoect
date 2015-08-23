@@ -2,7 +2,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h> 
+#include <netdb.h>
+#include <string.h> 
+#include<stdlib.h>
 
 void error(char *msg)
 {
@@ -39,10 +41,12 @@ int main(int argc, char *argv[])
     serv_addr.sin_port = htons(portno);
     if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
+   
+  for(;;){
     printf("Please enter the message: ");
     bzero(buffer,256);
     fgets(buffer,255,stdin);
-    n = write(sockfd,buffer,strlen(buffer));
+    n = write(sockfd,buffer,strlen(buffer)-1);
     if (n < 0) 
          error("ERROR writing to socket");
     bzero(buffer,256);
@@ -50,5 +54,7 @@ int main(int argc, char *argv[])
     if (n < 0) 
          error("ERROR reading from socket");
     printf("%s\n",buffer);
+	}
     return 0;
+
 }

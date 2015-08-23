@@ -1,4 +1,5 @@
 LDFLAGS =
+CFLAGS=-g
 SOURCES = src/server.c
 NAME = server
 
