@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/epoll.h>
 #include <arpa/inet.h>
+#include <stddef.h>
 //#include "server.h"
 #define BUFF_SIZE 256
 #define BUFF_SIZE_OUT 5242880
@@ -172,8 +173,12 @@ int execute_command(char * command,int fd){
 	if(strlen(buffer)==0)
 		strcpy(buffer,"No such file or directory");
         pclose(fp);
-	if(fd>0)
+	if(fd>0){
+	size_t size = strlen(buffer);
+	send(fd,&size,sizeof(size),0);
+	printf("%zu, sizeof buffer\n",size);
   	send(fd,buffer,strlen(buffer),0);
+	}
 	
 free(buffer);
 
