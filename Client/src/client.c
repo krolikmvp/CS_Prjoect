@@ -4,13 +4,43 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string.h> 
-#include<stdlib.h>
+#include <stdlib.h>
+#include <getopt.h>
 #define _cd "cd"
 #define _ls "ls"
 #define _pwd "pwd"
 #define _cat "cat"
 #define _exit "exit"
+#define BUFF_SIZE 5242880
 
+
+const char * program_name;
+const struct option long_options[]={
+
+	{"ip", 1 , NULL , 'i' },
+	{"port", 1 , NULL , 'p' },
+	{"help", 0 , NULL , 'h' },
+	{ NULL , 0, NULL , 0}
+
+};
+
+void print_usage (FILE* stream, int exit_code) 
+{
+
+ fprintf (stream, "Usage: %s options [ inputfile .... ]\n", program_name); 
+
+ fprintf (stream, 
+
+          "  -h  --help            Display this usage information.\n" 
+
+          "  -i  --ip <ip_adress>          IP of the server you want connect.\n" 
+
+          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
+
+ exit (exit_code); 
+
+}
+ 
 void error(char *msg)
 {
     perror(msg);
@@ -21,21 +51,36 @@ int validate_send(char *);
 
 int main(int argc, char *argv[])
 {
-    int sockfd, portno, n;
-
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
-
-    char buffer[256];
     if (argc < 3) {
        fprintf(stderr,"usage %s hostname port\n", argv[0]);
        exit(0);
     }
-    portno = atoi(argv[2]);
+
+    int sockfd, portno, n;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+    int next_option;
+    const char* const short_options="i:p:h";
+    program_name=argv[0];   
+    do{
+	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
+	
+	switch(next_option)
+	{
+	  case 'i':server = gethostbyname(optarg);break;
+	  case 'p':portno = atoi(optarg); break;
+	  case 'h':print_usage(stdout,0);break;
+	  case '?':exit(0);
+	  //case -1: break;
+	}
+      }while(next_option!=-1);
+    char *buffer=(char*)malloc(sizeof(char)*BUFF_SIZE);
+    
+    
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
         error("ERROR opening socket");
-    server = gethostbyname(argv[1]);
+    
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
@@ -54,23 +99,24 @@ int main(int argc, char *argv[])
 
 	do{
 		printf("Please enter the message: ");
-    		bzero(buffer,256);
-    		fgets(buffer,255,stdin);
+    		bzero(buffer,strlen(buffer));
+    		fgets(buffer,BUFF_SIZE-1,stdin);
 		valid=validate_send(buffer);		
 	}while(valid==0);
 
     if(valid<0) break;   
-
+    
     n = write(sockfd,buffer,strlen(buffer)-1);
     if (n < 0) 
          error("ERROR writing to socket");
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
+    bzero(buffer,strlen(buffer));
+    n = read(sockfd,buffer,BUFF_SIZE-1);
+    printf("%zu \n",strlen(buffer));
     if (n < 0) 
          error("ERROR reading from socket");
     printf("%s\n",buffer);
 	}
-
+    free(buffer);
     close(sockfd);
     printf("Closing client\n");
     return 0;

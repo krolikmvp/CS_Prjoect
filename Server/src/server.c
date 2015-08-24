@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 //#include "server.h"
 #define BUFF_SIZE 256
+#define BUFF_SIZE_OUT 5242880
 #define _cd "cd "
 #define  _ls "ls"
 #define _pwd "pwd"
@@ -103,10 +104,6 @@ int main(int argc, const char *argv[])
 			} else {
 				cli_fd=es[i].data.fd;
 				if (es[i].events & EPOLLERR || es[i].events & EPOLLHUP || es[i].events & EPOLLRDHUP) {
-					//TODO bad event on client fd - clean client:
-					//		* remove asociated user from the list
-					//		* remove socket from epoll
-					//		* close socket
 					epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 					close(cli_fd);
 					
@@ -142,9 +139,12 @@ int main(int argc, const char *argv[])
 int execute_command(char * command,int fd){
 
   if(!strncmp(command,_cd,strlen(_cd))){
-	chdir(command+strlen(_cd));
+	int status=chdir(command+strlen(_cd));
 	char x[BUFF_SIZE];
-	getcwd(x,BUFF_SIZE);
+	if(!status)
+		getcwd(x,BUFF_SIZE);
+	else
+		strcpy(x,"No such file or directory");
 	send(fd,x,strlen(x),0);
 	return 0;
 
@@ -152,10 +152,11 @@ int execute_command(char * command,int fd){
 
 
   FILE *fp;
-  static char buffer[]="";
+ // static char buffer[]="";
+  char *buffer=(char*)malloc(sizeof(char)*BUFF_SIZE_OUT);
   char temp[128];
   bzero(temp,128);
-  bzero(buffer,BUFF_SIZE);
+  bzero(buffer,BUFF_SIZE_OUT);
   /* Open the command for reading. */
   fp = popen(command, "r");
   if (fp == NULL) {
@@ -168,11 +169,13 @@ int execute_command(char * command,int fd){
 	strcat(buffer,temp);
 	
   }
+	if(strlen(buffer)==0)
+		strcpy(buffer,"No such file or directory");
         pclose(fp);
 	if(fd>0)
   	send(fd,buffer,strlen(buffer),0);
 	
-
+free(buffer);
 
 }
 
