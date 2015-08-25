@@ -1,21 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/epoll.h>
-#include <arpa/inet.h>
-#include <stddef.h>
-//#include "server.h"
-#define BUFF_SIZE 256
-#define BUFF_SIZE_OUT 5242880
-#define _cd "cd "
-#define  _ls "ls"
-#define _pwd "pwd"
-#define _cat "cat "
+#include "server.h"
 
-int execute_command(char *,int);
 
 int main(int argc, const char *argv[])
 {
@@ -23,7 +7,9 @@ int main(int argc, const char *argv[])
 	int user_number=0;
 	int i = 0;
 	char buff[BUFF_SIZE];
+        uint8_t buffer[BUFF_SIZE];
 	memset(buff,0,BUFF_SIZE);
+	memset(buffer,0,BUFF_SIZE);
 	int srv_fd = -1;
 	int cli_fd = -1;
 	int epoll_fd = -1;
@@ -45,7 +31,8 @@ int main(int argc, const char *argv[])
 
 	srv_addr.sin_family = AF_INET;
 	srv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	srv_addr.sin_port = htons(5556);
+	int prt=atoi(argv[1]);
+	srv_addr.sin_port = htons(prt);
 	if (bind(srv_fd, (struct sockaddr*) &srv_addr, sizeof(srv_addr)) < 0) {
 		printf("Cannot bind socket\n");
 		close(srv_fd);
@@ -112,14 +99,15 @@ int main(int argc, const char *argv[])
 				}
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
-					//read(cli_fd, &msg_len, sizeof(msg_len));
-					readb=read(cli_fd, buff,sizeof(buff)-1 );
-					printf("Odczytiane dane : %zu %zu\n",sizeof(buff),readb);
+					size_t msg_len=0;
+					read(cli_fd, &msg_len, sizeof(size_t));
+					//buffer=malloc(msg_len*sizeof(uint8_t));
+					readb=read(cli_fd, buffer,msg_len );
+					printf("Odczytiane dane : %zu %zu, message type :%d\n",msg_len,readb,set_msg_type(buffer));
 
 					if (readb > 0) {
 						execute_command(buff,cli_fd);	
 						printf("Wyslano wiadomosc\n");
-                                         	//bzero(&response_buff,strlen(response_buff));
 					}
 				
 					bzero(buff,readb);
@@ -135,56 +123,6 @@ int main(int argc, const char *argv[])
 
 	return 0;
 }
-
-
-int execute_command(char * command,int fd){
-
-  if(!strncmp(command,_cd,strlen(_cd))){
-	int status=chdir(command+strlen(_cd));
-	char x[BUFF_SIZE];
-	if(!status)
-		getcwd(x,BUFF_SIZE);
-	else
-		strcpy(x,"No such file or directory");
-	send(fd,x,strlen(x),0);
-	return 0;
-
-  }
-
-
-  FILE *fp;
- // static char buffer[]="";
-  char *buffer=(char*)malloc(sizeof(char)*BUFF_SIZE_OUT);
-  char temp[128];
-  bzero(temp,128);
-  bzero(buffer,BUFF_SIZE_OUT);
-  /* Open the command for reading. */
-  fp = popen(command, "r");
-  if (fp == NULL) {
-    printf("Failed to run command\n" );
-    exit(1);
-  }
-
-  /* Read the output a line at a time - output it. */
-  while (fgets(temp, sizeof(temp)-1, fp) != NULL) {
-	strcat(buffer,temp);
-	
-  }
-	if(strlen(buffer)==0)
-		strcpy(buffer,"No such file or directory");
-        pclose(fp);
-	if(fd>0){
-	size_t size = strlen(buffer);
-	send(fd,&size,sizeof(size),0);
-	printf("%zu, sizeof buffer\n",size);
-  	send(fd,buffer,strlen(buffer),0);
-	}
-	
-free(buffer);
-
-}
-
-
 
 
 
