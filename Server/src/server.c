@@ -3,7 +3,10 @@
 
 int main(int argc, const char *argv[])
 {
-	
+
+	char directory[BUFF_SIZE];
+	strcpy(directory,argv[2]);
+	chdir(argv[2]);		
 	int user_number=0;
 	int i = 0;
 	char buff[BUFF_SIZE];
@@ -100,13 +103,15 @@ int main(int argc, const char *argv[])
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
 					size_t msg_len=0;
+                                        int msg_type=0;
 					read(cli_fd, &msg_len, sizeof(size_t));
-					//buffer=malloc(msg_len*sizeof(uint8_t));
 					readb=read(cli_fd, buffer,msg_len );
-					printf("Odczytiane dane : %zu %zu, message type :%d\n",msg_len,readb,set_msg_type(buffer));
+                                        msg_type=set_msg_type(buffer);
+
+					printf("Odczytiane dane : %zu %zu, message type :%d\n",msg_len,readb,msg_type);
 
 					if (readb > 0) {
-						execute_command(buff,cli_fd);	
+						execute_command(directory,buffer,cli_fd,msg_type);	
 						printf("Wyslano wiadomosc\n");
 					}
 				

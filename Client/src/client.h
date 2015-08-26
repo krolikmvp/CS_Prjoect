@@ -14,6 +14,7 @@
 #define _exit "exit"
 #define BUFF_SIZE 5242880
 #define TEMP_BUFF_SIZE 128
+#define MAX_HEAD_SIZE  3
 
 enum msg_type{
    CD=1,
@@ -21,6 +22,16 @@ enum msg_type{
    CAT,
    LS
 };
+
+typedef struct message_context {
+   
+   int head;
+   int size;
+   int elements;
+   char **content;
+
+} msg;
+
 
 //const char * program_name;
 /*
@@ -61,29 +72,42 @@ int validate_send(char *);
 int write_to_srv(int fd, char * buff, int msg_type)
 {
 
+
+
+
+
+
+
     uint8_t *buffer;
     int pos=0;
     size_t size=sizeof(int);
+    int tmp=0;
 
     switch(msg_type){
 
     case 1://cd
-           size+=sizeof(char)*( strlen(buff)-strlen(_cd) )-2; //-2 bo \n i cd_
+	   tmp=strlen(buff)-strlen(_cd) -2;
+           size+=sizeof(int) + tmp; //-2 bo \n i cd_
            buffer=malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
            pos+=sizeof(int);
-           memcpy(buffer+pos,buff+(strlen(_cd)+1),strlen(buff+strlen(_cd)+1) );
+           memcpy(buffer+pos,&tmp,sizeof(int));
+           pos+=sizeof(int);
+           memcpy(buffer+pos,buff+(strlen(_cd)+1),strlen(buff+strlen(_cd)) );
            break;
     case 2://pwd
            buffer=malloc(size);
            memcpy(buffer,&msg_type,size);
            break;
     case 3://cat
-	   size+=sizeof(char)*(strlen(buff)-strlen(_cat))-2; //-2 bo \n i cat_
+	   tmp= strlen(buff)-strlen(_cat) - 2;
+	   size+=sizeof(int)+tmp; //-2 bo \n i cat_
            buffer=malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
            pos+=sizeof(int);
-           memcpy(buffer+pos,buff+(strlen(_cat)+1),strlen(buff+strlen(_cat)+1) );
+	   memcpy(buffer+pos,&tmp,sizeof(int));
+	   pos+=sizeof(int);
+           memcpy(buffer+pos,buff+(strlen(_cat)+1),strlen(buff+strlen(_cat)) );
 	   break;
     case 4://ls
            buffer=malloc(size);
@@ -97,6 +121,61 @@ int write_to_srv(int fd, char * buff, int msg_type)
 
   free(buffer);
 
+
+}
+
+int read_from_server(int fd)
+{
+    int size=0;
+    int pos=0;
+    int bytes_read=0;
+    int msg_type=0;
+    int i=0;
+    int string_size=0;
+    msg * message=malloc(sizeof(msg));
+    uint8_t temp[TEMP_BUFF_SIZE];
+    read(fd,&size,sizeof(size_t));
+    message->size=size;
+    uint8_t *buffer=malloc(size);
+    printf("====%d bytes to read====\n",size);
+   
+
+    while(bytes_read!=size){
+      bzero(temp,TEMP_BUFF_SIZE);
+      bytes_read+=read(fd,temp,TEMP_BUFF_SIZE-1);
+      memcpy(buffer+pos,&temp,bytes_read);
+      pos+=bytes_read;
+    }
+   pos=0;
+
+   memcpy(&message->head,buffer,sizeof(int));
+   pos+=sizeof(int);
+
+   if(message->head==LS){
+	memcpy(&message->elements,buffer+pos,sizeof(int));
+	pos+=sizeof(int);
+        message->content=(char**)malloc(message->elements);
+        
+        for(i;i<message->elements;++i){
+	     string_size=0;
+	     memcpy(&string_size,buffer+pos,sizeof(int));
+	     pos+=sizeof(int);
+             message->content[i]=(char*)malloc(string_size);
+	     bzero(message->content[i],string_size);
+	     memcpy(message->content[i],buffer+pos,string_size);
+	     printf("%s\n",message->content[i]);
+	     pos+=string_size;	
+
+	}
+   }
+   
+
+for(i=0;i<message->elements;++i){
+	free(message->content[i]);
+}
+free(buffer);
+free(message->content);
+free(message);
 
 }
 
