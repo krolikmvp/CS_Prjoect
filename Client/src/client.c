@@ -52,8 +52,9 @@ int main(int argc, char *argv[])
 
     do{
 		printf("Please enter the message: ");
-    		bzero(buff,TEMP_BUFF_SIZE);
-    		fgets(buff,TEMP_BUFF_SIZE-1,stdin);
+        bzero(buff,TEMP_BUFF_SIZE);
+    	fgets(buff,TEMP_BUFF_SIZE-1,stdin);
+		//strcpy(buff,"cat src/server.c\n");
 		msg_type=validate_send(buff);		
     }while(msg_type==0);
 
