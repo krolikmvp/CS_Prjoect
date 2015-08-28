@@ -19,13 +19,30 @@ enum msg_type{
    CD=1,
    PWD,
    CAT,
-   LS
+   LS,
+   ERROR
 };
+
+enum cd_flags{
+
+    CH_DIR=10,
+    PREMISSION_ERROR = 17,     // "PREMISSION DENIED"
+    EXIST_ERROR = 24,   // "DIRECTORY DOES NOT EXIST"
+    FILE_ERROR = 19      // "FILE DOES NOT EXIST"
+
+};
+
 
 typedef struct element_and_size{
 	char* item;
 	int size;
 } es;
+ 
+void error(char *msg)
+{
+    perror(msg);
+    exit(0);
+}
 
 int set_msg_type( uint8_t * msg ){
 
@@ -39,7 +56,43 @@ int process_cd(char*,uint8_t *, int);
 int process_pwd(int);
 int process_cat(char*,uint8_t *, int);
 int process_ls(int);
+int send_error_msg(int,int);
+char* error_switch(int);
 
+int send_error_msg(int fd, int err_type){
+
+    uint8_t *bitstring;
+    int pos = 0;
+    int err_size=err_type;
+    int msg_type=ERROR;
+    int size=2*sizeof(int)+err_size;
+
+    bitstring=malloc(size);
+
+    memcpy(bitstring,&msg_type,sizeof(int));
+    pos+=sizeof(int);
+    memcpy(bitstring+pos,&err_size,sizeof(int));
+    pos+=sizeof(int);
+    memcpy(bitstring+pos,error_switch(err_type),err_size);
+    pos+=err_size;
+
+    send(fd,&size,sizeof(size_t),0);
+    send(fd,bitstring,size,0);
+
+    free(bitstring);
+}
+
+char* error_switch(int err_type){
+
+    switch(err_type){
+
+        case PREMISSION_ERROR : return "PREMISSION DENIED";
+        case EXIST_ERROR :      return "DIRECTORY DOES NOT EXIST";
+        case FILE_ERROR :       return "FILE DOES NOT EXIST";
+
+    }
+
+}
 
 int execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 
@@ -101,7 +154,6 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
 
     printf("POS : %d\n",pos);
     printf("SIZE : %lu\n",size);
-
     send(fd,&size,sizeof(size_t),0);
 	send(fd,bitstring,size,0);
 
@@ -180,7 +232,7 @@ int process_ls(int fd)
 		pos+=elements[i].size;
 		free(elements[i].item);
 	} 
-	
+
 	send(fd,&bitstring_size,sizeof(size_t),0);	
 	send(fd,bitstring,bitstring_size,0);
 	free(elements);
@@ -189,25 +241,96 @@ int process_ls(int fd)
 } 
 
 int process_cd(char* directory,uint8_t *buffer, int fd){
-  int pos=sizeof(int);
-  int string_size=0;
-  memcpy(&string_size,buffer+pos,sizeof(int));
-  pos+=sizeof(int);
+
+    int msg_type=CD;
+    int pos=sizeof(int);
+    int size=2*sizeof(int);
+    int string_size=0;
+    int flag=0;
+    uint8_t *bitstring;
+    int err=ERROR;
+    int err_size=0;
+    memcpy(&string_size,buffer+pos,sizeof(int));
+    pos+=sizeof(int);
   
     char directory_buff[BUFF_SIZE];
 	bzero(directory_buff,BUFF_SIZE);
     getcwd(directory_buff,BUFF_SIZE-1);
+    char parameter[string_size];
+    memset(parameter,0,string_size);
+    memcpy(parameter,buffer+pos,string_size);
+   
 
-    if(!strcmp(buffer+pos,"..")){
-        if(strcmp(directory_buff,directory)){
-            chdir(buffer+pos);
-           	bzero(directory_buff,BUFF_SIZE);
+    if( !strcmp(parameter,"..")  && !strcmp(directory_buff,directory) ) //cd .. w katalogu root
+           flag=PREMISSION_ERROR;
+    else if ( !strcmp(parameter,"/") || !strcmp(parameter,"~")){
+
+            chdir(directory);
+            bzero(directory_buff,BUFF_SIZE);
             getcwd(directory_buff,BUFF_SIZE-1);
-            printf("%s \n",directory_buff);
-        }else{
-         printf("NJE MASZ DOSTEPU SUKO\n");
-        }
+            string_size=strlen(directory_buff);
     }
-	
+    else {
+           if( chdir(parameter) ){ //fail chdir
 
+                flag=EXIST_ERROR;          
+
+           } else { // no failed
+                bzero(directory_buff,BUFF_SIZE);
+                getcwd(directory_buff,BUFF_SIZE-1);
+                string_size=strlen(directory_buff);         
+                if( !strncmp( directory, directory_buff , strlen(directory)) )  // chdir zawiera sciezke roota
+                        flag=CH_DIR;             
+                else{
+                        flag=PREMISSION_ERROR;     //chdir nie zawiera sciazki roota
+                        chdir("-");
+                }
+           }
+           
+    }
+
+    if(flag==CH_DIR)
+    size+=string_size;
+    else
+    size+=flag;
+    
+    bitstring=malloc(size);
+    bzero(bitstring,size);
+    pos=0;
+    switch(flag){
+
+        case CH_DIR : 
+               memcpy(bitstring,&msg_type,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,&string_size,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,directory_buff,string_size);
+               pos+=string_size;             
+               break;
+        case PREMISSION_ERROR :
+               err_size=PREMISSION_ERROR;
+               memcpy(bitstring,&err,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,&err_size,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,"PREMISSION DENIED",err_size);
+               pos+=err_size;
+               break;
+        case EXIST_ERROR :
+               err_size=EXIST_ERROR; 
+               memcpy(bitstring,&err,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,&err_size,sizeof(int));
+               pos+=sizeof(int);
+               memcpy(bitstring+pos,"DIRECTORY DOES NOT EXIST",err_size);
+               pos+=err_size;
+               break;
+
+
+    }
+   
+  
+    send(fd,&pos,sizeof(size_t),0);
+    send(fd,bitstring,pos,0);
+    free(bitstring);
 }

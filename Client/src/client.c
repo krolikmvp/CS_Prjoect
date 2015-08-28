@@ -15,14 +15,15 @@ int main(int argc, char *argv[])
     do{
 	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
 	
-	switch(next_option)
-	{
-	  case 'i':server = gethostbyname(optarg);break;
-	  case 'p':portno = atoi(optarg); break;
-	  case 'h'://print_usage(stdout,0);break;
-	  case '?':exit(0);
-	}
+	    switch(next_option)
+	    {
+	        case 'i':server = gethostbyname(optarg);break;
+	        case 'p':portno = atoi(optarg); break;
+	        case 'h'://print_usage(stdout,0);break;
+	        case '?':exit(0);
+	    }
       }while(next_option!=-1);
+
     if (argc < 3) {
        exit(0);
     }
@@ -35,6 +36,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
     }
+
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr,server->h_length);
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
 		printf("Please enter the message: ");
         bzero(buff,TEMP_BUFF_SIZE);
     	fgets(buff,TEMP_BUFF_SIZE-1,stdin);
-		//strcpy(buff,"cat src/server.c\n");
+		//strcpy(buff,"cd ..\n");
 		msg_type=validate_send(buff);		
     }while(msg_type==0);
 

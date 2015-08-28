@@ -6,13 +6,14 @@ int main(int argc, const char *argv[])
 
 	char directory[BUFF_SIZE];
 	strcpy(directory,argv[2]);
-	chdir(argv[2]);		
+	if( chdir(argv[2]) ){
+        error("WRONG STARTING DIRECTORY");
+        exit(0);        
+    }
 	int user_number=0;
 	int i = 0;
-	char buff[BUFF_SIZE];
-        uint8_t buffer[BUFF_SIZE];
-	memset(buff,0,BUFF_SIZE);
-	memset(buffer,0,BUFF_SIZE);
+    //uint8_t buffer[BUFF_SIZE];
+//	memset(buffer,0,BUFF_SIZE);
 	int srv_fd = -1;
 	int cli_fd = -1;
 	int epoll_fd = -1;
@@ -103,23 +104,25 @@ int main(int argc, const char *argv[])
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
 					size_t msg_len=0;
-                                        int msg_type=0;
+                    int msg_type=0;
 					read(cli_fd, &msg_len, sizeof(size_t));
+                    uint8_t *buffer=malloc(msg_len);
 					readb=read(cli_fd, buffer,msg_len );
-                                        msg_type=set_msg_type(buffer);
+                    msg_type=set_msg_type(buffer);
 
-					printf("Odczytiane dane : %zu %zu, message type :%d\n",msg_len,readb,msg_type);
+					printf("Expected : %zu Read: %zu, message type :%d\n",msg_len,readb,msg_type);
 
 					if (readb > 0) {
 						execute_command(directory,buffer,cli_fd,msg_type);	
 						printf("Wyslano wiadomosc\n");
 					}
-				
-					bzero(buff,readb);
+				    bzero(buffer,msg_len);
+                    free(buffer);
+		
 				}
 				else {
                                         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
-					close(cli_fd);
+				                    	close(cli_fd);
 				     }
 			}
 		}

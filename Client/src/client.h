@@ -20,10 +20,11 @@ enum msg_type{
    CD=1,
    PWD,
    CAT,
-   LS
+   LS,
+   ERROR
 };
 
-typedef struct message_context {
+typedef struct message_structure {
    
    int head;
    int size;
@@ -70,6 +71,7 @@ void error(char *msg)
 }
 
 int validate_send(char *);
+void print_message(msg * );
 int write_to_srv(int fd, char * buff, int msg_type)
 {
 
@@ -81,7 +83,7 @@ int write_to_srv(int fd, char * buff, int msg_type)
     switch(msg_type){
 
     case 1://cd
-	   tmp=strlen(buff)-strlen(_cd) -2;
+	       tmp=strlen(buff)-strlen(_cd) -2;
            size+=sizeof(int) + tmp; //-2 bo \n i cd_
            buffer=malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
@@ -95,13 +97,13 @@ int write_to_srv(int fd, char * buff, int msg_type)
            memcpy(buffer,&msg_type,size);
            break;
     case 3://cat
-	   tmp= strlen(buff)-strlen(_cat) - 2;
-	   size+=sizeof(int)+tmp; //-2 bo \n i cat_
+	       tmp= strlen(buff)-strlen(_cat) - 2;
+	       size+=sizeof(int)+tmp; //-2 bo \n i cat_
            buffer=(char*)malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
            pos+=sizeof(int);
-	   memcpy(buffer+pos,&tmp,sizeof(int));
-	   pos+=sizeof(int);
+	       memcpy(buffer+pos,&tmp,sizeof(int));
+	       pos+=sizeof(int);
            memcpy(buffer+pos,buff+(strlen(_cat)+1), tmp );
 	   break;
     case 4://ls
@@ -132,7 +134,7 @@ int read_from_server(int fd)
     read(fd,&size,sizeof(size_t));
     message->size=size;
     uint8_t *buffer=malloc(size);
-    printf("====%d bytes to read====\n",size);
+    //printf("====%d bytes to read====\n",size);
    
     int tmp_size=0;
     while(bytes_read!=size){
@@ -142,7 +144,7 @@ int read_from_server(int fd)
       bytes_read+=tmp_size;
       pos+=tmp_size;
     }
-   printf("====%d bytes read from ====\n",bytes_read);
+   //printf("====%d bytes read from ====\n",bytes_read);
    pos=0;
 
    memcpy(&message->head,buffer,sizeof(int));
@@ -157,42 +159,65 @@ int read_from_server(int fd)
 	       string_size=0;
 	       memcpy(&string_size,buffer+pos,sizeof(int));
 	       pos+=sizeof(int);
-           message->content[i]=(char*)malloc(string_size);
+           message->content[i]=malloc(string_size+1);
 	       bzero(message->content[i],string_size);
 	       memcpy(message->content[i],buffer+pos,string_size);
-	    // printf("%s\n",message->content[i]);
+           message->content[i][string_size]=0;
+	   //  printf("%s\n",message->content[i]);
 	       pos+=string_size;	
 
         }
+    
+        print_message(message);
+
+
+        for(i=0;i<message->elements;++i){
+	       free(message->content[i]);
+	    }
+        
+        free(message->content);
+
+
    } else {
         
 	    string_size=0;
         memcpy(&string_size,buffer+pos,sizeof(int));
         pos+=sizeof(int);
-        printf("====%d position ====\n",pos);         
-        printf("====%d msg_size ====\n",string_size);
-        message->string=(char*)malloc(string_size-pos);
-        bzero(message->string,string_size-pos);
-        memcpy(message->string,buffer+pos,string_size-pos);
-        int i=0;
-        
-	    //printf("%s",message->string);
-
+        message->string=malloc(string_size);
+        bzero(message->string,string_size+1);
+        memcpy(message->string,buffer+pos,string_size);
+        print_message(message);
         free(message->string);
+       
    }  
  
-   if(message->head==LS){
-
-	for(i=0;i<message->elements;++i){
-	     free(message->content[i]);
-	}
-        
-    free(message->content);
-
-   }
 
 free(buffer);
 free(message);
 
+}
+
+void print_message( msg * message){
+
+       printf("\n");
+       printf("MESSAGE TYPE : %d\n",message->head);
+       printf("MESSAGE SIZE : %d\n",message->size);
+
+       if( message->head == LS )
+       {
+            printf("MESSAGE ELEMENTS : %d\n",message->elements);
+            printf("MESSAGE CONTENT : \n");
+            int i=0;
+            for (i ; i< message->elements ; ++i)
+                printf("%d : %s\n",i+1,message->content[i]);
+       } else {
+
+            printf("MESSAGE CONTENT : \n");
+            printf("%s\n",message->string);
+
+
+       }
+
+       printf("\n");
 }
 
