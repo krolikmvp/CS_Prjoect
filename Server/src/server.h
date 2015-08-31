@@ -39,12 +39,13 @@ typedef struct element_and_size{
 	char* item;
 	int size;
 } es;
- 
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
-}
+
+int send_error_msg(int,int);
+char* error_switch(int);
+int process_cd(char*,uint8_t *, int);
+int process_pwd(int);
+int process_cat(char*,uint8_t *, int);
+int process_ls(int);
 
 int set_msg_type( uint8_t * msg ){
 
@@ -54,12 +55,11 @@ int set_msg_type( uint8_t * msg ){
 
 }
 
-int process_cd(char*,uint8_t *, int);
-int process_pwd(int);
-int process_cat(char*,uint8_t *, int);
-int process_ls(int);
-int send_error_msg(int,int);
-char* error_switch(int);
+void error(char *msg)
+{
+    perror(msg);
+    exit(0);
+}
 
 char* error_switch(int err_type){
 
@@ -95,6 +95,7 @@ int send_error_msg(int fd, int err_type){
 
     free(bitstring);
 }
+
 
 int execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 
@@ -273,7 +274,7 @@ int process_cd(char* directory,uint8_t *buffer, int fd){
     if( !strcmp(parameter,"..")  && !strcmp(directory_buff,directory) ) //cd .. w katalogu root
            flag=PREMISSION_ERROR;
     else if ( !strcmp(parameter,"/") || !strcmp(parameter,"~")){
-
+            flag=CH_DIR;
             chdir(directory);
             bzero(directory_buff,BUFF_SIZE);
             getcwd(directory_buff,BUFF_SIZE-1);
@@ -292,7 +293,7 @@ int process_cd(char* directory,uint8_t *buffer, int fd){
                         flag=CH_DIR;             
                 else{
                         flag=PREMISSION_ERROR;     //chdir nie zawiera sciazki roota
-                        chdir("-");
+                        chdir(directory);
                 }
            }
            
