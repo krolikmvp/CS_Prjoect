@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include<errno.h>
 #define _cd "cd"
 #define _ls "ls"
 #define _pwd "pwd"
@@ -83,7 +84,7 @@ int write_to_srv(int fd, char * buff, int msg_type)
     switch(msg_type){
 
     case 1://cd
-	       tmp=strlen(buff)-strlen(_cd) -2;
+	       tmp=strlen(buff)-strlen(_cd)-1;
            size+=sizeof(int) + tmp; //-2 bo \n i cd_
            buffer=malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
@@ -134,8 +135,8 @@ int read_from_server(int fd)
     read(fd,&size,sizeof(size_t));
     message->size=size;
     uint8_t *buffer=malloc(size);
-    //printf("====%d bytes to read====\n",size);
-   
+    bzero(buffer,size);
+
     int tmp_size=0;
     while(bytes_read!=size){
       bzero(temp,TEMP_BUFF_SIZE);
@@ -144,7 +145,7 @@ int read_from_server(int fd)
       bytes_read+=tmp_size;
       pos+=tmp_size;
     }
-   //printf("====%d bytes read from ====\n",bytes_read);
+
    pos=0;
 
    memcpy(&message->head,buffer,sizeof(int));
@@ -156,15 +157,14 @@ int read_from_server(int fd)
      message->content=(char**)malloc(sizeof(char*)*message->elements);
         
         for(i;i<message->elements;++i){
-	       string_size=0;
-	       memcpy(&string_size,buffer+pos,sizeof(int));
-	       pos+=sizeof(int);
-           message->content[i]=malloc(string_size+1);
-	       bzero(message->content[i],string_size);
-	       memcpy(message->content[i],buffer+pos,string_size);
-           message->content[i][string_size]=0;
-	   //  printf("%s\n",message->content[i]);
-	       pos+=string_size;	
+	         string_size=0;
+	         memcpy(&string_size,buffer+pos,sizeof(int));
+	         pos+=sizeof(int);
+             message->content[i]=malloc(string_size+1);
+	         bzero(message->content[i],string_size);
+	         memcpy(message->content[i],buffer+pos,string_size);
+             message->content[i][string_size]=0;
+	         pos+=string_size;	
 
         }
     
@@ -172,7 +172,7 @@ int read_from_server(int fd)
 
 
         for(i=0;i<message->elements;++i){
-	       free(message->content[i]);
+	         free(message->content[i]);
 	    }
         
         free(message->content);
@@ -183,9 +183,10 @@ int read_from_server(int fd)
 	    string_size=0;
         memcpy(&string_size,buffer+pos,sizeof(int));
         pos+=sizeof(int);
-        message->string=malloc(string_size);
-        bzero(message->string,string_size+1);
+        message->string=malloc(string_size+1);
+        bzero(message->string,string_size);
         memcpy(message->string,buffer+pos,string_size);
+        message->string[string_size]=0;
         print_message(message);
         free(message->string);
        

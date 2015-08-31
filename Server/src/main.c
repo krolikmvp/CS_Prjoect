@@ -12,8 +12,6 @@ int main(int argc, const char *argv[])
     }
 	int user_number=0;
 	int i = 0;
-    //uint8_t buffer[BUFF_SIZE];
-//	memset(buffer,0,BUFF_SIZE);
 	int srv_fd = -1;
 	int cli_fd = -1;
 	int epoll_fd = -1;
@@ -64,7 +62,7 @@ int main(int argc, const char *argv[])
 		close(srv_fd);
 		return 1;
 	}
-	////////////////////////////////////////////////////////////////////////////////
+	////////////MAIN SERVER LOOP
 	for(;;) {
 		i = epoll_wait(epoll_fd, es, 11, -1);
 
@@ -76,7 +74,6 @@ int main(int argc, const char *argv[])
 		}
 
 		for (--i; i > -1; --i) {
-			printf("Event %x\n", es[i].events);
 			if (es[i].data.fd == srv_fd) {
 				cli_fd = accept(srv_fd, (struct sockaddr*) &cli_addr, &cli_addr_len);
 				if (cli_fd < 0) {
@@ -96,6 +93,8 @@ int main(int argc, const char *argv[])
 			} else {
 				cli_fd=es[i].data.fd;
 				if (es[i].events & EPOLLERR || es[i].events & EPOLLHUP || es[i].events & EPOLLRDHUP) {
+
+                    printf("Client with ile descriptor [%d] disconnected\n",cli_fd);
 					epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 					close(cli_fd);
 					
@@ -114,13 +113,17 @@ int main(int argc, const char *argv[])
 
 					if (readb > 0) {
 						execute_command(directory,buffer,cli_fd,msg_type);	
-						printf("Wyslano wiadomosc\n");
-					}
+						printf("MSG HAS BEEN SENT\n");
+					} else {
+
+                        printf("CANNOT READ DATA FROM CLIENT\n");
+                    }
 				    bzero(buffer,msg_len);
                     free(buffer);
 		
 				}
 				else {
+                                        printf("Client %d disconnected\n",cli_fd);
                                         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 				                    	close(cli_fd);
 				     }
