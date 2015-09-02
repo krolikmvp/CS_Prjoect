@@ -1,15 +1,36 @@
 #include "server.h"
 
 
-int main(int argc, const char *argv[])
+int main(int argc, char *argv[])
 {
+   
+    int next_option;
+    const char* const short_options="d:p:h";
+    size_t size=0;
+    char directory[BUFF_SIZE];
+    int prt=0;
+    char *program_name=argv[0];   
+    do{
+	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
+	
+	    switch(next_option)
+	    {
+	        case 'd':strcpy(directory,optarg);break;
+	        case 'p':prt = atoi(optarg); break;
+	        case 'h':print_usage(stdout,0,program_name);break;
+	        case '?':exit(0);
+	    }
+      }while(next_option!=-1);
 
-	char directory[BUFF_SIZE];
-	strcpy(directory,argv[2]);
-	if( chdir(argv[2]) ){
+    if (argc < 3) {
+        printf("Invalid usage. Use -h or --help for usage informations\n");
+       exit(0);
+    }	
+	if( chdir(directory) ){
         error("WRONG STARTING DIRECTORY");
         exit(0);        
     }
+    int exit_flag=0;
 	int user_number=0;
 	int i = 0;
 	int srv_fd = -1;
@@ -33,7 +54,6 @@ int main(int argc, const char *argv[])
 
 	srv_addr.sin_family = AF_INET;
 	srv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	int prt=atoi(argv[1]);
 	srv_addr.sin_port = htons(prt);
 	if (bind(srv_fd, (struct sockaddr*) &srv_addr, sizeof(srv_addr)) < 0) {
 		printf("Cannot bind socket\n");
@@ -47,7 +67,7 @@ int main(int argc, const char *argv[])
 		return 1;
 	}
 
-	epoll_fd = epoll_create(11);
+	epoll_fd = epoll_create(1);
 	if (epoll_fd < 0) {
 		printf("Cannot create epoll\n");
 		close(srv_fd);
@@ -64,7 +84,7 @@ int main(int argc, const char *argv[])
 	}
 	////////////MAIN SERVER LOOP
 	for(;;) {
-		i = epoll_wait(epoll_fd, es, 11, -1);
+		i = epoll_wait(epoll_fd, es, 1, -1);
 
 		if (i < 0) {
 			printf("Cannot wait for events\n");
@@ -94,10 +114,10 @@ int main(int argc, const char *argv[])
 				cli_fd=es[i].data.fd;
 				if (es[i].events & EPOLLERR || es[i].events & EPOLLHUP || es[i].events & EPOLLRDHUP) {
 
-                    printf("Client with ile descriptor [%d] disconnected\n",cli_fd);
+                    printf("Client with file descriptor [%d] disconnected\n",cli_fd);
 					epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 					close(cli_fd);
-					
+				    exit_flag=1;
 
 				}
 				else if ( es[i].events & EPOLLIN ){
@@ -126,14 +146,31 @@ int main(int argc, const char *argv[])
                                         printf("Client %d disconnected\n",cli_fd);
                                         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 				                    	close(cli_fd);
-				     }
+                                        exit_flag=1;
+			    }
 			}
+            
 		}
+        if(exit_flag)break;
 	}
-
-
+    printf("Closing Server\n");
 	return 0;
 }
 
+void print_usage (FILE* stream, int exit_code,char * program_name) 
+{
 
+ fprintf (stream, "Usage: %s [OPTIONS]\n", program_name); 
+
+ fprintf (stream, 
+
+          "  -h  --help            Display this usage information.\n" 
+
+          "  -d  --directory <directory>          Starting(root) directory of your remote file program.\n" 
+
+          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
+
+ exit (exit_code); 
+
+}
 

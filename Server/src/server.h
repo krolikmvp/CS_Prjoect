@@ -7,15 +7,16 @@
 #include <sys/epoll.h>
 #include <arpa/inet.h>
 #include <stddef.h>
-#include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
-#define BUFF_SIZE 256
-#define BUFF_SIZE_OUT 5242880
-#define _cd "cd "
-#define  _ls "ls"
-#define _pwd "pwd"
-#define _cat "cat "
+#include <netinet/in.h>
+#include <netdb.h>
+#include <getopt.h>
+#include <errno.h>
+#include <inttypes.h>
+#define BUFF_SIZE 512
+#define SMALL_BUFF 128
+#define cpmv(a, b ,c, d) memcpy(a+c,&b,d);c+=d
 
 enum msg_type{
    CD=1,
@@ -34,16 +35,25 @@ enum cd_flags{
     OUT_OF_MEMORY_ERROR = 13  //"OUT OF MEMORY"
 };
 
+const struct option long_options[]={
+
+	{"directory", 1 , NULL , 'd' },
+	{"port", 1 , NULL , 'p' },
+	{"help", 0 , NULL , 'h' },
+	{ NULL , 0, NULL , 0}
+
+};
 
 typedef struct element_and_size{
 	char* item;
 	int size;
 } es;
 
+void print_usage (FILE*, int,char *);
 int send_error_msg(int,int);
 char* error_switch(int);
 int process_cd(char*,uint8_t *, int);
-int process_pwd(int);
+int process_pwd(char*, int);
 int process_cat(char*,uint8_t *, int);
 int process_ls(int);
 
@@ -82,13 +92,9 @@ int send_error_msg(int fd, int err_type){
     int size=2*sizeof(int)+err_size;
 
     bitstring=malloc(size);
-
-    memcpy(bitstring,&msg_type,sizeof(int));
-    pos+=sizeof(int);
-    memcpy(bitstring+pos,&err_size,sizeof(int));
-    pos+=sizeof(int);
-    memcpy(bitstring+pos,error_switch(err_type),err_size);
-    pos+=err_size;
+    cpmv(bitstring, msg_type ,pos,sizeof(int));
+    cpmv(bitstring, err_size ,pos,sizeof(int));
+    cpmv(bitstring, *error_switch(err_type) ,pos,err_size);
 
     send(fd,&size,sizeof(size_t),0);
     send(fd,bitstring,size,0);
@@ -102,7 +108,7 @@ int execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 	switch(msg_type){
 
 	        case CD: process_cd(directory,command,fd); break;
-            case PWD: process_pwd(fd); break;
+            case PWD: process_pwd(directory,fd); break;
             case CAT: process_cat(directory,command,fd); break;
             case LS: process_ls(fd); break;
 
@@ -120,10 +126,10 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
     long int size=2*(sizeof(int));
 	FILE *fp;
 	uint8_t *bitstring;
-    uint8_t temp[128];
-    bzero(temp,128);   
+    uint8_t temp[SMALL_BUFF];
+    bzero(temp,SMALL_BUFF);  
 	memcpy(&string_size,buffer+pos,sizeof(int));
-	pos+=sizeof(int);
+    pos+=sizeof(int);
 
 	char buf[string_size];
 	bzero(buf,string_size+1);
@@ -132,32 +138,31 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
 	int status=0;
     struct stat st_buf;
 	fp = fopen(buf, "r");
+
+    char *check_path=realpath(buf,NULL);
+
     status = stat (buf, &st_buf);
     if (status != 0) {
         printf ("Error, errno = %d\n", errno);
     }
 
-  	if (fp == NULL || S_ISDIR (st_buf.st_mode) ) {
+  	if (fp == NULL || S_ISDIR (st_buf.st_mode) ) { // czy plik jst katalogiem
   	    send_error_msg(fd, FILE_ERROR);
-    }  else {
+    }  else if( strncmp( directory, check_path , strlen(directory)) ){
+         send_error_msg(fd, PREMISSION_ERROR);
+    } else {
         fseek(fp, 0L, SEEK_END);
-        size+=ftell(fp);
+        string_size=ftell(fp);
+        size+=string_size;
         fseek(fp,0L,SEEK_SET);
-        // size=size-1;////////////// 
-         pos=0;
-         bitstring=malloc(size);
-         memcpy(bitstring,&msg_type,sizeof(int));
-         pos+=sizeof(int);
-         memcpy(bitstring+pos,&size,sizeof(int));
-         pos+=sizeof(int);
-         while (fgets(temp, sizeof(temp) , fp)!=NULL){
+        pos=0;
+        bitstring=malloc(size);
+        cpmv(bitstring, msg_type ,pos,sizeof(int));
+        cpmv(bitstring, string_size ,pos,sizeof(int));
 
-	             memcpy(bitstring+pos,temp,strlen(temp));
-                 pos+=strlen(temp); 
-                 bzero(temp,128);}
-           
-    
-        	
+         while (fgets(temp, sizeof(temp) , fp)!=NULL){
+                 cpmv(bitstring, temp ,pos,strlen(temp));
+                 bzero(temp,128);}        
 
     	if(send(fd,&size,sizeof(size_t),0) < 0)
           error("CANNOT SEND DATA");
@@ -166,32 +171,44 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
          free(bitstring);
          fclose(fp);
     }
-
+    free(check_path);
 }
 
-int process_pwd(int fd)
+int process_pwd(char* directory,int fd)
 {
 	int msg_type=PWD;
     char directory_buff[BUFF_SIZE];
 	bzero(directory_buff,BUFF_SIZE);
     getcwd(directory_buff,BUFF_SIZE-1);
-	int buff_len=strlen(directory_buff);
+    size_t newdir_size=strlen(directory_buff)-strlen(directory);
+    char* newdir;   
+    size_t buff_len=0;
+
+    if(newdir_size){
+        newdir=(char*)malloc(newdir_size);
+        memcpy(newdir,directory_buff+strlen(directory),newdir_size);
+        buff_len=newdir_size;
+    } else {
+        newdir=malloc(sizeof(char));
+        newdir[0]='/';
+        buff_len=sizeof(char);
+    }
+
 	size_t size=2*sizeof(int)+buff_len;
 	int pos=0;
 	
 	uint8_t *bitstring= malloc(size);
 	bzero(bitstring,size);
-		
-	memcpy(bitstring,&msg_type,sizeof(int));
-	pos+=sizeof(int);
-	memcpy(bitstring+pos, &buff_len , sizeof(int));
-	pos+=sizeof(int);
-	memcpy(bitstring+pos, directory_buff , buff_len );
-	
+    cpmv(bitstring, msg_type ,pos,sizeof(int));
+    cpmv(bitstring, buff_len ,pos,sizeof(int));
+    cpmv(bitstring, *newdir ,pos,buff_len);
+    free(newdir);
+
 	if(send(fd,&size,sizeof(size_t),0) < 0)
         error("CANNOT SEND DATA");
 	if(send(fd,bitstring,size,0) < 0)
         error("CANNOT SEND DATA");
+
 
 	free(bitstring);
 
@@ -226,17 +243,12 @@ int process_ls(int fd)
 
 	    uint8_t *bitstring= malloc(bitstring_size);
 	    bzero(bitstring,bitstring_size);
-	    memcpy(bitstring,&msg_type,sizeof(int));
-    	pos+=sizeof(int);
-	    memcpy(bitstring+pos,&elem_count,sizeof(int));
-	    pos+=sizeof(int);
-	
-	    for(i=0; i < elem_count ; ++i){
+        cpmv(bitstring, msg_type ,pos,sizeof(int));
+        cpmv(bitstring, elem_count ,pos,sizeof(int));
 
-		    memcpy(bitstring+pos,&elements[i].size,sizeof(int));
-		    pos+=sizeof(int);
-		    memcpy(bitstring+pos,elements[i].item,elements[i].size);
-		    pos+=elements[i].size;
+	    for(i=0; i < elem_count ; ++i){
+            cpmv(bitstring, elements[i].size ,pos,sizeof(int));
+            cpmv(bitstring, *elements[i].item ,pos,elements[i].size);
 		    free(elements[i].item);
 	    } 
 
@@ -306,23 +318,7 @@ int process_cd(char* directory,uint8_t *buffer, int fd){
     
 
     if(flag==CH_DIR){
-               uint8_t *bitstring;
-               bitstring=malloc(size);
-               bzero(bitstring,size);
-               pos=0;
-               memcpy(bitstring,&msg_type,sizeof(int));
-               pos+=sizeof(int);
-               memcpy(bitstring+pos,&string_size,sizeof(int));
-               pos+=sizeof(int);
-               memcpy(bitstring+pos,directory_buff,string_size);
-               pos+=string_size;             
-               if(send(fd,&size,sizeof(size_t),0) < 0)
-                      error("CANNOT SEND DATA");
-	           if(send(fd,bitstring,size,0) < 0)
-                      error("CANNOT SEND DATA");
-
-               free(bitstring);  
-
+        process_pwd(directory,fd);
     } else if(flag==EXIST_ERROR) {
           send_error_msg(fd, EXIST_ERROR);
     } else if(flag==PREMISSION_ERROR) {

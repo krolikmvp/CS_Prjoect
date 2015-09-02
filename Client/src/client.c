@@ -4,14 +4,16 @@
 
 int main(int argc, char *argv[])
 {
-  
+
+
+
     int sockfd, portno, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
     int next_option;
     const char* const short_options="i:p:h";
     size_t size=0;
-    //program_name=argv[0];   
+    char *program_name=argv[0];   
     do{
 	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
 	
@@ -19,13 +21,15 @@ int main(int argc, char *argv[])
 	    {
 	        case 'i':server = gethostbyname(optarg);break;
 	        case 'p':portno = atoi(optarg); break;
-	        case 'h'://print_usage(stdout,0);break;
+	        case 'h':print_usage(stdout,0,program_name);break;
 	        case '?':exit(0);
 	    }
-      }while(next_option!=-1);
 
-    if (argc < 3) {
-       exit(0);
+    }while(next_option!=-1);
+
+    if (argc < 3) { 
+        printf("Invalid usage. Use -h or --help for usage informations\n");
+        exit(0); 
     }
    
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -60,8 +64,6 @@ int main(int argc, char *argv[])
 		msg_type=validate_send(buff);		
     }while(msg_type==0);
 
-	
-
     if(msg_type<0) break;
    
     write_to_srv(sockfd,buff,msg_type);
@@ -74,40 +76,21 @@ int main(int argc, char *argv[])
 
 }
 
-int validate_send(char * buff){
 
-	if(!strncmp(buff,_cd,strlen(_cd))){
-		if( (strlen(buff)-1)==strlen(_cd) ){
-		     printf("ERROR: Parameters needed \"cd <directory_name>\"\n");
-		     return 0;}
-		else if( (strlen(buff)-1) > (strlen(_cd)+1) && buff[2]==' ' )
-	             return 1;
 
-	}
-	if(!strncmp(buff,_cat,strlen(_cat))){
-		if( (strlen(buff)-1)==strlen(_cat) ){
-		     printf("ERROR: Parameters needed \"cat <file_name>\"\n");
-		     return 0;}
-		else if( (strlen(buff)-1) > (strlen(_cat)+1) && buff[3]==' ' )
-	             return 3;
+void print_usage (FILE* stream, int exit_code,char * program_name) 
+{
 
-	}
-	if(!strncmp(buff,_ls,strlen(_ls))){
-		if( (strlen(buff)-1)==strlen(_ls) )
-	             return 4;
+ fprintf (stream, "Usage: %s <ip_adress> <server_port>\n", program_name); 
 
-	}
-	if(!strncmp(buff,_pwd,strlen(_pwd))){
-		if( (strlen(buff)-1)==strlen(_pwd) )
-	             return 2;
-	}
-	if(!strncmp(buff,_exit,strlen(_exit))){
-		if( (strlen(buff)-1)==strlen(_exit) )
-	             return -1;
-	}
+ fprintf (stream, 
 
-printf("ERROR: Wrong command\n");
-return 0;
+          "  -h  --help            Display this usage information.\n" 
+
+          "  -i  --ip <ip_adress>          IP of the server you want connect.\n" 
+
+          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
+
+ exit (exit_code); 
+
 }
-
-

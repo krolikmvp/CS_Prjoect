@@ -13,9 +13,8 @@
 #define _pwd "pwd"
 #define _cat "cat"
 #define _exit "exit"
-#define BUFF_SIZE 5242880
 #define TEMP_BUFF_SIZE 128
-#define MAX_HEAD_SIZE  3
+#define MTU_SIZE 1500
 
 enum msg_type{
    CD=1,
@@ -35,26 +34,6 @@ typedef struct message_structure {
 
 } msg;
 
-
-//const char * program_name;
-/*
-void print_usage (FILE* stream, int exit_code) 
-{
-
- fprintf (stream, "Usage: %s options [ inputfile .... ]\n", program_name); 
-
- fprintf (stream, 
-
-          "  -h  --help            Display this usage information.\n" 
-
-          "  -i  --ip <ip_adress>          IP of the server you want connect.\n" 
-
-          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
-
- exit (exit_code); 
-
-}*/
-
 const struct option long_options[]={
 
 	{"ip", 1 , NULL , 'i' },
@@ -71,8 +50,10 @@ void error(char *msg)
     exit(0);
 }
 
+void print_usage (FILE*, int,char *);
 int validate_send(char *);
 void print_message(msg * );
+
 int write_to_srv(int fd, char * buff, int msg_type)
 {
 
@@ -85,7 +66,7 @@ int write_to_srv(int fd, char * buff, int msg_type)
 
     case 1://cd
 	       tmp=strlen(buff)-strlen(_cd)-1;
-           size+=sizeof(int) + tmp; //-2 bo \n i cd_
+           size+=sizeof(int) + tmp;
            buffer=malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
            pos+=sizeof(int);
@@ -99,7 +80,7 @@ int write_to_srv(int fd, char * buff, int msg_type)
            break;
     case 3://cat
 	       tmp= strlen(buff)-strlen(_cat) - 2;
-	       size+=sizeof(int)+tmp; //-2 bo \n i cat_
+	       size+=sizeof(int)+tmp;
            buffer=(char*)malloc(size);
            memcpy(buffer,&msg_type,sizeof(int));
            pos+=sizeof(int);
@@ -131,7 +112,7 @@ int read_from_server(int fd)
     int i=0;
     int string_size=0;
     msg * message=malloc(sizeof(msg));
-    uint8_t temp[TEMP_BUFF_SIZE];
+    uint8_t temp[MTU_SIZE];
     read(fd,&size,sizeof(size_t));
     message->size=size;
     uint8_t *buffer=malloc(size);
@@ -139,8 +120,8 @@ int read_from_server(int fd)
 
     int tmp_size=0;
     while(bytes_read!=size){
-      bzero(temp,TEMP_BUFF_SIZE);
-      tmp_size=read(fd,temp,TEMP_BUFF_SIZE-1);
+      bzero(temp,MTU_SIZE);
+      tmp_size=read(fd,temp,MTU_SIZE-1);
       memcpy(buffer+pos,&temp,tmp_size);
       bytes_read+=tmp_size;
       pos+=tmp_size;
@@ -184,7 +165,7 @@ int read_from_server(int fd)
         memcpy(&string_size,buffer+pos,sizeof(int));
         pos+=sizeof(int);
         message->string=malloc(string_size+1);
-        bzero(message->string,string_size);
+        bzero(message->string,string_size+1);
         memcpy(message->string,buffer+pos,string_size);
         message->string[string_size]=0;
         print_message(message);
@@ -222,3 +203,38 @@ void print_message( msg * message){
        printf("\n");
 }
 
+int validate_send(char * buff){
+////sprawdza poprawnosc wpisywanych komend
+	if(!strncmp(buff,_cd,strlen(_cd))){
+		if( (strlen(buff)-1)==strlen(_cd) ){
+		     printf("ERROR: Parameters needed \"cd <directory_name>\"\n");
+		     return 0;}
+		else if( (strlen(buff)-1) > (strlen(_cd)+1) && buff[2]==' ' )
+	             return 1;
+
+	}
+	if(!strncmp(buff,_cat,strlen(_cat))){
+		if( (strlen(buff)-1)==strlen(_cat) ){
+		     printf("ERROR: Parameters needed \"cat <file_name>\"\n");
+		     return 0;}
+		else if( (strlen(buff)-1) > (strlen(_cat)+1) && buff[3]==' ' )
+	             return 3;
+
+	}
+	if(!strncmp(buff,_ls,strlen(_ls))){
+		if( (strlen(buff)-1)==strlen(_ls) )
+	             return 4;
+
+	}
+	if(!strncmp(buff,_pwd,strlen(_pwd))){
+		if( (strlen(buff)-1)==strlen(_pwd) )
+	             return 2;
+	}
+	if(!strncmp(buff,_exit,strlen(_exit))){
+		if( (strlen(buff)-1)==strlen(_exit) )
+	             return -1;
+	}
+
+printf("ERROR: Wrong command\n");
+return 0;
+}
