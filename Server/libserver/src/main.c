@@ -6,6 +6,7 @@ int main(int argc, char *argv[])
    
     int next_option;
     const char* const short_options="d:p:h";
+    size_t size=0;
     char directory[BUFF_SIZE];
     int prt=0;
     char *program_name=argv[0];   

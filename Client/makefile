@@ -1,19 +1,6 @@
-CFLAGS=-g
-LDFLAGS =
-SOURCES = src/client.c
-NAME = client
-
-OBJECTS = $(SOURCES:.c=.o)
-
-all: $(NAME)
-
-
-$(NAME): $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $(NAME)
-
-%.o: %.c
-	$(CC) -c $(CFLAGS) $< -o $@
+all:
+		make -C ./build
 
 clean:
-	rm -f $(OBJECTS)
-	rm -f $(NAME)
+
+		make -C ./build clean

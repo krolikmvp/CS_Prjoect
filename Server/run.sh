@@ -1,5 +1,5 @@
 #!/bin/bash
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./src
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./libserver/build
 
-./server 1
+./server -d/home/student/workspace/CS_Prjoect/Server -p5556

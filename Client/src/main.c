@@ -7,12 +7,11 @@ int main(int argc, char *argv[])
 
 
 
-    int sockfd, portno, n;
+    int sockfd, portno;
     struct sockaddr_in serv_addr;
     struct hostent *server;
     int next_option;
     const char* const short_options="i:p:h";
-    size_t size=0;
     char *program_name=argv[0];   
     do{
 	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
@@ -33,8 +32,10 @@ int main(int argc, char *argv[])
     }
    
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) 
+    if (sockfd < 0){ 
         error("ERROR opening socket");
+        exit(0);
+    }
     
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
@@ -46,8 +47,10 @@ int main(int argc, char *argv[])
     bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr,server->h_length);
     serv_addr.sin_port = htons(portno);
 
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) 
+    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0){
            error("ERROR connecting");
+           exit(0);
+    }
      
     char buff[TEMP_BUFF_SIZE];
     bzero(buff,TEMP_BUFF_SIZE);

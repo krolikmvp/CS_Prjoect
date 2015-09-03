@@ -1,61 +1,11 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/epoll.h>
-#include <arpa/inet.h>
-#include <stddef.h>
-#include <limits.h>
-#include <sys/stat.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <getopt.h>
-#include <errno.h>
-#include <inttypes.h>
-#define BUFF_SIZE 512
-#define SMALL_BUFF 128
-#define cpmv(a, b ,c, d) memcpy(a+c,&b,d);c+=d
+#include "server.h"
 
-enum msg_type{
-   CD=1,
-   PWD,
-   CAT,
-   LS,
-   ERROR
-};
 
-enum cd_flags{
-
-    CH_DIR=10,
-    PREMISSION_ERROR = 17,     // "PREMISSION DENIED"
-    EXIST_ERROR = 24,   // "DIRECTORY DOES NOT EXIST"
-    FILE_ERROR = 19,    // "FILE DOES NOT EXIST"
-    OUT_OF_MEMORY_ERROR = 13  //"OUT OF MEMORY"
-};
-
-const struct option long_options[]={
-
-	{"directory", 1 , NULL , 'd' },
-	{"port", 1 , NULL , 'p' },
-	{"help", 0 , NULL , 'h' },
-	{ NULL , 0, NULL , 0}
-
-};
-
-typedef struct element_and_size{
-	char* item;
-	int size;
-} es;
-
-void print_usage (FILE*, int,char *);
-int send_error_msg(int,int);
-char* error_switch(int);
-int process_cd(char*,uint8_t *, int);
-int process_pwd(char*, int);
-int process_cat(char*,uint8_t *, int);
-int process_ls(int);
+void error(char *msg)
+{
+    perror(msg);
+    exit(0);
+}
 
 int set_msg_type( uint8_t * msg ){
 
@@ -63,12 +13,6 @@ int set_msg_type( uint8_t * msg ){
 	memcpy(&type,msg,sizeof(int));
 	return type;
 
-}
-
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
 }
 
 char* error_switch(int err_type){
@@ -79,11 +23,12 @@ char* error_switch(int err_type){
         case EXIST_ERROR :      return "DIRECTORY DOES NOT EXIST";
         case FILE_ERROR :       return "FILE DOES NOT EXIST";
         case OUT_OF_MEMORY_ERROR : return "OUT OF MEMORY";
+        default : return "UNKNOWN ERROR TYPE";
     }
-
+    return "UNKNOWN ERROR TYPE";
 }
 
-int send_error_msg(int fd, int err_type){
+void send_error_msg(int fd, int err_type){
 
     uint8_t *bitstring;
     int pos = 0;
@@ -96,14 +41,44 @@ int send_error_msg(int fd, int err_type){
     cpmv(bitstring, err_size ,pos,sizeof(int));
     cpmv(bitstring, *error_switch(err_type) ,pos,err_size);
 
-    send(fd,&size,sizeof(size_t),0);
-    send(fd,bitstring,size,0);
+    send_message(fd,size,bitstring);
 
     free(bitstring);
 }
+int send_message(int fd,size_t size, uint8_t *bitstring){
 
 
-int execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
+        size_t position=0; 
+        size_t to_send=0;
+
+        if( write(fd,&size,sizeof(size_t)) <0 ){
+            error("SEND ERROR");
+            return 0;
+        }
+
+        if(size<=MTU_SIZE){
+
+              if( write(fd,bitstring,size) < 0){
+                    error("SEND ERROR");
+                    return 0;
+              }
+
+        } else {
+
+              while(position!=size){
+                    to_send=(size-position)>MTU_SIZE ? MTU_SIZE : size-position;
+                    if( write(fd,bitstring+position,to_send) < 0) {
+                         error("SEND ERROR");
+                         return 0;
+                    }
+                    position+=to_send;
+              }
+
+        }
+    return 1;
+}
+
+void execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 
 	switch(msg_type){
 
@@ -117,7 +92,7 @@ int execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 }
 
 
-int process_cat(char* directory, uint8_t *buffer, int fd)
+void process_cat(char* directory, uint8_t *buffer, int fd)
 {
 
 	int msg_type=CAT;
@@ -126,7 +101,7 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
     long int size=2*(sizeof(int));
 	FILE *fp;
 	uint8_t *bitstring;
-    uint8_t temp[SMALL_BUFF];
+    char temp[SMALL_BUFF];
     bzero(temp,SMALL_BUFF);  
 	memcpy(&string_size,buffer+pos,sizeof(int));
     pos+=sizeof(int);
@@ -164,17 +139,14 @@ int process_cat(char* directory, uint8_t *buffer, int fd)
                  cpmv(bitstring, temp ,pos,strlen(temp));
                  bzero(temp,128);}        
 
-    	if(send(fd,&size,sizeof(size_t),0) < 0)
-          error("CANNOT SEND DATA");
-    	if(send(fd,bitstring,size,0) < 0)
-          error("CANNOT SEND DATA");
+         send_message(fd,size,bitstring);
          free(bitstring);
          fclose(fp);
     }
     free(check_path);
 }
 
-int process_pwd(char* directory,int fd)
+void process_pwd(char* directory,int fd)
 {
 	int msg_type=PWD;
     char directory_buff[BUFF_SIZE];
@@ -204,17 +176,14 @@ int process_pwd(char* directory,int fd)
     cpmv(bitstring, *newdir ,pos,buff_len);
     free(newdir);
 
-	if(send(fd,&size,sizeof(size_t),0) < 0)
-        error("CANNOT SEND DATA");
-	if(send(fd,bitstring,size,0) < 0)
-        error("CANNOT SEND DATA");
 
+    send_message(fd,size,bitstring);
 
 	free(bitstring);
 
 }
 
-int process_ls(int fd)
+void process_ls(int fd)
 {
 	es *elements=(es*)malloc(BUFF_SIZE*sizeof(es));
 	int msg_type=LS;
@@ -252,26 +221,19 @@ int process_ls(int fd)
 		    free(elements[i].item);
 	    } 
 
-	if(send(fd,&bitstring_size,sizeof(size_t),0) < 0)
-        error("CANNOT SEND DATA");
-	if(send(fd,bitstring,bitstring_size,0) < 0)
-        error("CANNOT SEND DATA");
-	    free(bitstring);
+        send_message(fd,bitstring_size,bitstring);
+        free(bitstring);
     }
-
     free(elements);
 
 } 
 
-int process_cd(char* directory,uint8_t *buffer, int fd){
+void process_cd(char* directory,uint8_t *buffer, int fd){
 
-    int msg_type=CD;
     int pos=sizeof(int);
     int size=2*sizeof(int);
     int string_size=0;
     int flag=0;
-    int err=ERROR;
-    int err_size=0;
     memcpy(&string_size,buffer+pos,sizeof(int));
     pos+=sizeof(int);
   
@@ -318,7 +280,7 @@ int process_cd(char* directory,uint8_t *buffer, int fd){
     
 
     if(flag==CH_DIR){
-        process_pwd(directory,fd);
+          process_pwd(directory,fd);
     } else if(flag==EXIST_ERROR) {
           send_error_msg(fd, EXIST_ERROR);
     } else if(flag==PREMISSION_ERROR) {
