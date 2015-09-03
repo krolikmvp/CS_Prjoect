@@ -122,9 +122,9 @@ int main(int argc, char *argv[])
 				}
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
-					size_t msg_len=0;
-                    int msg_type=0;
-					read(cli_fd, &msg_len, sizeof(size_t));
+					uint16_t msg_len=0;
+                    uint8_t msg_type=0;
+					read(cli_fd, &msg_len, C_SIZE);
                     uint8_t *buffer=malloc(msg_len);
 					readb=read(cli_fd, buffer,msg_len );
                     msg_type=set_msg_type(buffer);

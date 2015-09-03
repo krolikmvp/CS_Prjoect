@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
   for(;;){
 
-    int msg_type=0;
+    uint8_t msg_type=0;
 
     do{
 		printf("Please enter the message: ");
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 		msg_type=validate_send(buff);		
     }while(msg_type==0);
 
-    if(msg_type<0) break;
+    if(msg_type==ERRORMSG) break;
    
     write_to_srv(sockfd,buff,msg_type);
     read_from_server(sockfd);

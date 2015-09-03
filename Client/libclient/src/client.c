@@ -1,43 +1,45 @@
 #include "client.h"
 
-void write_to_srv(int fd, char * buff, int msg_type)
+void write_to_srv(int fd, char * buff, uint8_t msg_type)
 {
 
-    uint8_t *buffer;
+    uint8_t *buffer=0;
     int pos=0;
-    size_t size=sizeof(int);
-    int tmp=0;
+    uint16_t size=M_TYPE;
+    uint16_t tmp=0;
 
     switch(msg_type){
 
     case 1://cd
 	       tmp=strlen(buff)-strlen(_cd)-1;
-           size+=sizeof(int) + tmp;
+           size+=C_SIZE + tmp;
            buffer=malloc(size);
-           cpmv(buffer,msg_type,pos,sizeof(int));
-           cpmv(buffer,tmp,pos,sizeof(int));
+           cpmv(buffer,msg_type,pos,M_TYPE);
+           cpmv(buffer,tmp,pos,C_SIZE);
            memcpy(buffer+pos,buff+(strlen(_cd)+1),tmp );
            break;
     case 2://pwd
            buffer=malloc(size);
-           memcpy(buffer,&msg_type,size);
+           memcpy(buffer,&msg_type,M_TYPE);
            break;
     case 3://cat
 	       tmp= strlen(buff)-strlen(_cat) - 2;
-	       size+=sizeof(int)+tmp;
+	       size+=C_SIZE+tmp;
            buffer=malloc(size);
-           cpmv(buffer,msg_type,pos,sizeof(int));
-           cpmv(buffer,tmp,pos,sizeof(int));
+           cpmv(buffer,msg_type,pos,M_TYPE);
+           cpmv(buffer,tmp,pos,C_SIZE);
            memcpy(buffer+pos,buff+(strlen(_cat)+1), tmp );
 	   break;
     case 4://ls
            buffer=malloc(size);
-           memcpy(buffer,&msg_type,size);
+           memcpy(buffer,&msg_type,M_TYPE);
            break;
-
+    default :
+           puts("MESSAGE TYPE ERROR");
+           exit(0);
     }
 
-  write(fd,&size,sizeof(size_t));
+  write(fd,&size,C_SIZE);
   write(fd,buffer,size);
 
   free(buffer);
@@ -51,12 +53,13 @@ void read_from_server(int fd)
     int pos=0;
     int bytes_read=0;
     int i=0;
-    int string_size=0;
+    uint16_t string_size=0;
     msg * message=malloc(sizeof(msg));
     uint8_t temp[MTU_SIZE];
     bzero(temp,MTU_SIZE);
     read(fd,&size,sizeof(size_t));
     message->size=size;
+    message->head=0;
     uint8_t *buffer=malloc(size);
     bzero(buffer,size);
 
@@ -69,15 +72,15 @@ void read_from_server(int fd)
       pos+=tmp_size;
     }
 
-   pos=0;
-   memcpy(&message->head,buffer,sizeof(int));
-   pos+=sizeof(int);
+   pos=0;//
+   memcpy(&message->head,buffer,M_TYPE);
+   pos+=M_TYPE;
 
    if(message->head==LS){
 	 memcpy(&message->elements,buffer+pos,sizeof(int));
  	 pos+=sizeof(int);
      message->content=(char**)malloc(sizeof(char*)*message->elements);
-        
+
         for(;i<message->elements;++i){
 	         string_size=0;
 	         memcpy(&string_size,buffer+pos,sizeof(int));
@@ -86,34 +89,34 @@ void read_from_server(int fd)
 	         bzero(message->content[i],string_size);
 	         memcpy(message->content[i],buffer+pos,string_size);
              message->content[i][string_size]=0;
-	         pos+=string_size;	
+	         pos+=string_size;
 
         }
-    
+
         print_message(message);
 
 
         for(i=0;i<message->elements;++i){
 	         free(message->content[i]);
 	    }
-        
+
         free(message->content);
 
 
    } else {
-        
+
 	    string_size=0;
-        memcpy(&string_size,buffer+pos,sizeof(int));
-        pos+=sizeof(int);
+        memcpy(&string_size,buffer+pos,M_SIZE);
+        pos+=M_SIZE;
         message->string=malloc(string_size+1);
         bzero(message->string,string_size+1);
         memcpy(message->string,buffer+pos,string_size);
         message->string[string_size]=0;
         print_message(message);
         free(message->string);
-       
-   }  
- 
+
+   }
+
 
 free(buffer);
 free(message);
@@ -138,20 +141,19 @@ void print_message( msg * message){
             printf("MESSAGE CONTENT : \n");
             printf("%s\n",message->string);
 
-
        }
 
        printf("\n");
 }
 
-int validate_send(char * buff){
+uint8_t validate_send(char * buff){
 ////sprawdza poprawnosc wpisywanych komend
 	if(!strncmp(buff,_cd,strlen(_cd))){
 		if( (strlen(buff)-1)==strlen(_cd) ){
 		     printf("ERROR: Parameters needed \"cd <directory_name>\"\n");
 		     return 0;}
 		else if( (strlen(buff)-1) > (strlen(_cd)+1) && buff[2]==' ' )
-	             return 1;
+	         return 1;
 
 	}
 	if(!strncmp(buff,_cat,strlen(_cat))){
@@ -173,7 +175,7 @@ int validate_send(char * buff){
 	}
 	if(!strncmp(buff,_exit,strlen(_exit))){
 		if( (strlen(buff)-1)==strlen(_exit) )
-	             return -1;
+	             return ERRORMSG;
 	}
 
 printf("ERROR: Wrong command\n");

@@ -7,10 +7,10 @@ void error(char *msg)
     exit(0);
 }
 
-int set_msg_type( uint8_t * msg ){
+uint8_t set_msg_type( uint8_t * msg ){
 
-	int type=0;
-	memcpy(&type,msg,sizeof(int));
+	uint8_t type=0;
+	memcpy(&type,msg,M_TYPE);
 	return type;
 
 }
@@ -33,12 +33,12 @@ void send_error_msg(int fd, int err_type){
     uint8_t *bitstring;
     int pos = 0;
     int err_size=err_type;
-    int msg_type=ERROR;
-    int size=2*sizeof(int)+err_size;
+    uint8_t msg_type=(uint8_t)ERROR;
+    int size=M_TYPE + M_SIZE +err_size;
 
     bitstring=malloc(size);
-    cpmv(bitstring, msg_type ,pos,sizeof(int));
-    cpmv(bitstring, err_size ,pos,sizeof(int));
+    cpmv(bitstring, msg_type ,pos,M_TYPE);
+    cpmv(bitstring, err_size ,pos,M_SIZE);
     cpmv(bitstring, *error_switch(err_type) ,pos,err_size);
 
     send_message(fd,size,bitstring);
@@ -78,7 +78,7 @@ int send_message(int fd,size_t size, uint8_t *bitstring){
     return 1;
 }
 
-void execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
+void execute_command(char* directory ,uint8_t * command,int fd,uint8_t msg_type){
 
 	switch(msg_type){
 
@@ -95,16 +95,16 @@ void execute_command(char* directory ,uint8_t * command,int fd,int msg_type){
 void process_cat(char* directory, uint8_t *buffer, int fd)
 {
 
-	int msg_type=CAT;
-	int pos=sizeof(int);
-	int string_size=0;
-    long int size=2*(sizeof(int));
+	uint8_t msg_type=(uint8_t)CAT;
+	int pos=M_TYPE;
+	uint16_t string_size=0;
+    long int size= M_TYPE + M_SIZE;
 	FILE *fp;
 	uint8_t *bitstring;
     char temp[SMALL_BUFF];
     bzero(temp,SMALL_BUFF);  
-	memcpy(&string_size,buffer+pos,sizeof(int));
-    pos+=sizeof(int);
+	memcpy(&string_size,buffer+pos,C_SIZE);
+    pos+=C_SIZE;
 
 	char buf[string_size];
 	bzero(buf,string_size+1);
@@ -132,8 +132,8 @@ void process_cat(char* directory, uint8_t *buffer, int fd)
         fseek(fp,0L,SEEK_SET);
         pos=0;
         bitstring=malloc(size);
-        cpmv(bitstring, msg_type ,pos,sizeof(int));
-        cpmv(bitstring, string_size ,pos,sizeof(int));
+        cpmv(bitstring, msg_type ,pos,M_TYPE);
+        cpmv(bitstring, string_size ,pos,M_SIZE);
 
          while (fgets(temp, sizeof(temp) , fp)!=NULL){
                  cpmv(bitstring, temp ,pos,strlen(temp));
@@ -148,7 +148,7 @@ void process_cat(char* directory, uint8_t *buffer, int fd)
 
 void process_pwd(char* directory,int fd)
 {
-	int msg_type=PWD;
+    uint8_t msg_type=(uint8_t)PWD;
     char directory_buff[BUFF_SIZE];
 	bzero(directory_buff,BUFF_SIZE);
     getcwd(directory_buff,BUFF_SIZE-1);
@@ -166,16 +166,16 @@ void process_pwd(char* directory,int fd)
         buff_len=sizeof(char);
     }
 
-	size_t size=2*sizeof(int)+buff_len;
+	size_t size=M_TYPE + M_SIZE + buff_len;
 	int pos=0;
 	
-	uint8_t *bitstring= malloc(size);
-	bzero(bitstring,size);
-    cpmv(bitstring, msg_type ,pos,sizeof(int));
-    cpmv(bitstring, buff_len ,pos,sizeof(int));
+	uint8_t *bitstring= malloc(size);//
+	bzero(bitstring,size);//
+   // cpmv(bitstring, size ,pos,sizeof(size_t));//
+    cpmv(bitstring, msg_type ,pos,M_TYPE);
+    cpmv(bitstring, buff_len ,pos,M_SIZE);
     cpmv(bitstring, *newdir ,pos,buff_len);
     free(newdir);
-
 
     send_message(fd,size,bitstring);
 
@@ -186,11 +186,11 @@ void process_pwd(char* directory,int fd)
 void process_ls(int fd)
 {
 	es *elements=(es*)malloc(BUFF_SIZE*sizeof(es));
-	int msg_type=LS;
+	uint8_t msg_type=(uint8_t)LS;
 	int elem_count=0;
 	int i=0;
 	int pos=0;
-	size_t bitstring_size=2*sizeof(int); // msg type + elem_count
+	size_t bitstring_size=M_TYPE + M_SIZE; // msg type + elem_count
  	FILE *fp;
   	char temp[128];
   	bzero(temp,128);
@@ -204,7 +204,7 @@ void process_ls(int fd)
 		    elements[elem_count].item = (char*)malloc( strlen(temp) );
 		    elements[elem_count].size = strlen( temp) -1 ;
 		    memcpy(elements[elem_count].item,temp,elements[elem_count].size);
-		    bitstring_size += elements[elem_count].size + sizeof(int);
+		    bitstring_size += elements[elem_count].size + M_SIZE;
 		    elem_count++;
 	    }
 
@@ -212,11 +212,11 @@ void process_ls(int fd)
 
 	    uint8_t *bitstring= malloc(bitstring_size);
 	    bzero(bitstring,bitstring_size);
-        cpmv(bitstring, msg_type ,pos,sizeof(int));
-        cpmv(bitstring, elem_count ,pos,sizeof(int));
+        cpmv(bitstring, msg_type ,pos,M_TYPE);
+        cpmv(bitstring, elem_count ,pos,M_SIZE);
 
 	    for(i=0; i < elem_count ; ++i){
-            cpmv(bitstring, elements[i].size ,pos,sizeof(int));
+            cpmv(bitstring, elements[i].size ,pos,M_SIZE);
             cpmv(bitstring, *elements[i].item ,pos,elements[i].size);
 		    free(elements[i].item);
 	    } 
@@ -230,12 +230,11 @@ void process_ls(int fd)
 
 void process_cd(char* directory,uint8_t *buffer, int fd){
 
-    int pos=sizeof(int);
-    int size=2*sizeof(int);
+    int pos=M_TYPE;
     int string_size=0;
     int flag=0;
-    memcpy(&string_size,buffer+pos,sizeof(int));
-    pos+=sizeof(int);
+    memcpy(&string_size,buffer+pos,C_SIZE);
+    pos+=C_SIZE;
   
     char directory_buff[BUFF_SIZE];
 	bzero(directory_buff,BUFF_SIZE);
@@ -252,7 +251,7 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
             chdir(directory);
             bzero(directory_buff,BUFF_SIZE);
             getcwd(directory_buff,BUFF_SIZE-1);
-            string_size=strlen(directory_buff);
+
     }
     else {
            if( chdir(parameter) ){ //fail chdir
@@ -261,8 +260,7 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
 
            } else { // no failed
                 bzero(directory_buff,BUFF_SIZE);
-                getcwd(directory_buff,BUFF_SIZE-1);
-                string_size=strlen(directory_buff);         
+                getcwd(directory_buff,BUFF_SIZE-1);       
                 if( !strncmp( directory, directory_buff , strlen(directory)) )  // chdir zawiera sciezke roota
                         flag=CH_DIR;             
                 else{
@@ -272,12 +270,6 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
            }
            
     }
-
-    if(flag==CH_DIR)
-    size+=string_size;
-    else
-    size+=flag;
-    
 
     if(flag==CH_DIR){
           process_pwd(directory,fd);

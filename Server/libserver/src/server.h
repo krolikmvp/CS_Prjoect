@@ -14,6 +14,9 @@
 #include <getopt.h>
 #include <errno.h>
 #include <inttypes.h>
+#define M_TYPE 1
+#define M_SIZE sizeof(int)
+#define C_SIZE sizeof(uint16_t)
 #define BUFF_SIZE 512
 #define SMALL_BUFF 128
 #define cpmv(a, b ,c, d) memcpy(a+c,&b,d);c+=d
@@ -51,8 +54,8 @@ typedef struct element_and_size{
 	int size;
 } es;
 
-void execute_command(char* ,uint8_t *,int,int);
-int set_msg_type( uint8_t *);
+void execute_command(char* ,uint8_t *,int,uint8_t);
+uint8_t set_msg_type( uint8_t *);
 void print_usage (FILE*, int,char *);
 void send_error_msg(int,int);
 char* error_switch(int);
