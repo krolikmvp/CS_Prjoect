@@ -12,10 +12,10 @@ int main(int argc, char *argv[])
     struct hostent *server;
     int next_option;
     const char* const short_options="i:p:h";
-    char *program_name=argv[0];   
+    char *program_name=argv[0];
     do{
-	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
-	
+	    next_option = getopt_long(argc,argv,short_options,long_options,NULL);
+
 	    switch(next_option)
 	    {
 	        case 'i':server = gethostbyname(optarg);break;
@@ -26,17 +26,17 @@ int main(int argc, char *argv[])
 
     }while(next_option!=-1);
 
-    if (argc < 3) { 
+    if (argc < 3) {
         printf("Invalid usage. Use -h or --help for usage informations\n");
-        exit(0); 
+        exit(0);
     }
-   
+
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0){ 
+    if (sockfd < 0){
         error("ERROR opening socket");
         exit(0);
     }
-    
+
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
            error("ERROR connecting");
            exit(0);
     }
-     
+
     char buff[TEMP_BUFF_SIZE];
     bzero(buff,TEMP_BUFF_SIZE);
 
@@ -60,19 +60,18 @@ int main(int argc, char *argv[])
     uint8_t msg_type=0;
 
     do{
-		printf("Please enter the message: ");
+		    printf("Please enter the message: ");
         bzero(buff,TEMP_BUFF_SIZE);
-    	fgets(buff,TEMP_BUFF_SIZE-1,stdin);
-		//strcpy(buff,"cat x\n");
-		msg_type=validate_send(buff);		
+    	  fgets(buff,TEMP_BUFF_SIZE-1,stdin);
+		    msg_type=validate_send(buff);
     }while(msg_type==0);
 
     if(msg_type==ERRORMSG) break;
-   
+
     write_to_srv(sockfd,buff,msg_type);
     read_from_server(sockfd);
 
-  } 
+  }
     close(sockfd);
     printf("Closing client\n");
     return 0;
@@ -81,19 +80,19 @@ int main(int argc, char *argv[])
 
 
 
-void print_usage (FILE* stream, int exit_code,char * program_name) 
+void print_usage (FILE* stream, int exit_code,char * program_name)
 {
 
- fprintf (stream, "Usage: %s <ip_adress> <server_port>\n", program_name); 
+ fprintf (stream, "Usage: %s <ip_adress> <server_port>\n", program_name);
 
- fprintf (stream, 
+ fprintf (stream,
 
-          "  -h  --help            Display this usage information.\n" 
+          "  -h  --help            Display this usage information.\n"
 
-          "  -i  --ip <ip_adress>          IP of the server you want connect.\n" 
+          "  -i  --ip <ip_adress>          IP of the server you want connect.\n"
 
-          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
+          "  -p  --port <server_port>        Port of the server you want connect.\n");
 
- exit (exit_code); 
+ exit (exit_code);
 
 }

@@ -3,15 +3,15 @@
 
 int main(int argc, char *argv[])
 {
-   
+
     int next_option;
     const char* const short_options="d:p:h";
     char directory[BUFF_SIZE];
     int prt=0;
-    char *program_name=argv[0];   
+    char *program_name=argv[0];
     do{
-	next_option = getopt_long(argc,argv,short_options,long_options,NULL);
-	
+	    next_option = getopt_long(argc,argv,short_options,long_options,NULL);
+
 	    switch(next_option)
 	    {
 	        case 'd':strcpy(directory,optarg);break;
@@ -19,17 +19,17 @@ int main(int argc, char *argv[])
 	        case 'h':print_usage(stdout,0,program_name);break;
 	        case '?':exit(0);
 	    }
-      }while(next_option!=-1);
+    }while(next_option!=-1);
 
-    if (argc < 3) {
+  if (argc < 3) {
         printf("Invalid usage. Use -h or --help for usage informations\n");
-       exit(0);
-    }	
+        exit(0);
+  }
 	if( chdir(directory) ){
         error("WRONG STARTING DIRECTORY");
-        exit(0);        
-    }
-    int exit_flag=0;
+        exit(0);
+  }
+  int exit_flag=0;
 	int user_number=0;
 	int i = 0;
 	int srv_fd = -1;
@@ -113,42 +113,40 @@ int main(int argc, char *argv[])
 				cli_fd=es[i].data.fd;
 				if (es[i].events & EPOLLERR || es[i].events & EPOLLHUP || es[i].events & EPOLLRDHUP) {
 
-                    printf("Client with file descriptor [%d] disconnected\n",cli_fd);
-					epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
+          printf("Client with file descriptor [%d] disconnected\n",cli_fd);
+				  epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
 					close(cli_fd);
-				    exit_flag=1;
+				  exit_flag=1;
 
 				}
 				else if ( es[i].events & EPOLLIN ){
 					// Odczytywanie msg od klienta
 					uint16_t msg_len=0;
-                    uint8_t msg_type=0;
+          uint8_t msg_type=0;
 					read(cli_fd, &msg_len, sizeof(uint16_t));
-                    uint8_t *buffer=malloc(msg_len);
+          uint8_t *buffer=malloc(msg_len);
 					readb=read(cli_fd, buffer,msg_len );
-                    msg_type=set_msg_type(buffer);
-
-					printf("Expected : %zu Read: %zu, message type :%d\n",msg_len,readb,msg_type);
+          msg_type=set_msg_type(buffer);
 
 					if (readb > 0) {
-						execute_command(directory,buffer,cli_fd,msg_type);	
+						execute_command(directory,buffer,cli_fd,msg_type);
 						printf("MSG HAS BEEN SENT\n");
 					} else {
 
-                        printf("CANNOT READ DATA FROM CLIENT\n");
-                    }
+            printf("CANNOT READ DATA FROM CLIENT\n");
+          }
 				    bzero(buffer,msg_len);
-                    free(buffer);
-		
+            free(buffer);
+
 				}
 				else {
-                                        printf("Client %d disconnected\n",cli_fd);
-                                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
-				                    	close(cli_fd);
-                                        exit_flag=1;
+            printf("Client %d disconnected\n",cli_fd);
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cli_fd, &e);
+				  	close(cli_fd);
+            exit_flag=1;
 			    }
 			}
-            
+
 		}
         if(exit_flag)break;
 	}
@@ -156,20 +154,19 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void print_usage (FILE* stream, int exit_code,char * program_name) 
+void print_usage (FILE* stream, int exit_code,char * program_name)
 {
 
- fprintf (stream, "Usage: %s [OPTIONS]\n", program_name); 
+ fprintf (stream, "Usage: %s [OPTIONS]\n", program_name);
 
- fprintf (stream, 
+ fprintf (stream,
 
-          "  -h  --help            Display this usage information.\n" 
+          "  -h  --help            Display this usage information.\n"
 
-          "  -d  --directory <directory>          Starting(root) directory of your remote file program.\n" 
+          "  -d  --directory <directory>          Starting(root) directory of your remote file program.\n"
 
-          "  -p  --port <server_port>        Port of the server you want connect.\n"); 
+          "  -p  --port <server_port>        Port of the server you want connect.\n");
 
- exit (exit_code); 
+ exit (exit_code);
 
 }
-

@@ -48,7 +48,7 @@ void send_error_msg(int fd, int err_type){
 int send_message(int fd,size_t size, uint8_t *bitstring){
 
 
-        size_t position=0; 
+        size_t position=0;
         size_t to_send=0;
 
         if( write(fd,&size,sizeof(size_t)) <0 ){
@@ -64,7 +64,6 @@ int send_message(int fd,size_t size, uint8_t *bitstring){
               }
 
         } else {
-
               while(position!=size){
                     to_send=(size-position)>MTU_SIZE ? MTU_SIZE : size-position;
                     if( write(fd,bitstring+position,to_send) < 0) {
@@ -82,7 +81,7 @@ void execute_command(char* directory ,uint8_t * command,int fd,uint8_t msg_type)
 
 	switch(msg_type){
 
-	        case CD: process_cd(directory,command,fd); break;
+	          case CD: process_cd(directory,command,fd); break;
             case PWD: process_pwd(directory,fd); break;
             case CAT: process_cat(directory,command,fd); break;
             case LS: process_ls(fd); break;
@@ -98,25 +97,26 @@ void process_cat(char* directory, uint8_t *buffer, int fd)
 	uint8_t msg_type=(uint8_t)CAT;
 	int pos=M_TYPE;
 	uint16_t string_size=0;
-    long int size= M_TYPE + M_SIZE;
+  long int size= M_TYPE + M_SIZE;
 	FILE *fp;
 	uint8_t *bitstring;
-    char temp[SMALL_BUFF];
-    bzero(temp,SMALL_BUFF);  
+  char temp[SMALL_BUFF];
+  bzero(temp,SMALL_BUFF);
 	memcpy(&string_size,buffer+pos,C_SIZE);
-    pos+=C_SIZE;
+  pos+=C_SIZE;
 
 	char buf[string_size];
 	bzero(buf,string_size+1);
 	memcpy(&buf,buffer+pos,string_size);
-    
+
 	int status=0;
-    struct stat st_buf;
+  struct stat st_buf;
 	fp = fopen(buf, "r");
 
-    char *check_path=realpath(buf,NULL);
+  char *check_path=realpath(buf,NULL);
 
-    status = stat (buf, &st_buf);
+  status = stat (buf, &st_buf);
+
     if (status != 0) {
         printf ("Error, errno = %d\n", errno);
     }
@@ -137,8 +137,8 @@ void process_cat(char* directory, uint8_t *buffer, int fd)
 
          while (fgets(temp, sizeof(temp) , fp)!=NULL){
                  cpmv(bitstring, temp ,pos,strlen(temp));
-                 bzero(temp,128);}        
-
+                 bzero(temp,128);
+         }
          send_message(fd,size,bitstring);
          free(bitstring);
          fclose(fp);
@@ -150,10 +150,10 @@ void process_pwd(char* directory,int fd)
 {
     uint8_t msg_type=(uint8_t)PWD;
     char directory_buff[BUFF_SIZE];
-	bzero(directory_buff,BUFF_SIZE);
+	  bzero(directory_buff,BUFF_SIZE);
     getcwd(directory_buff,BUFF_SIZE-1);
     size_t newdir_size=strlen(directory_buff)-strlen(directory);
-    char* newdir;   
+    char* newdir;
     size_t buff_len=0;
 
     if(newdir_size){
@@ -166,11 +166,11 @@ void process_pwd(char* directory,int fd)
         buff_len=sizeof(char);
     }
 
-	size_t size=M_TYPE + M_SIZE + buff_len;
-	int pos=0;
-	
-	uint8_t *bitstring= malloc(size);//
-	bzero(bitstring,size);//
+  	size_t size=M_TYPE + M_SIZE + buff_len;
+	  int pos=0;
+
+  	uint8_t *bitstring= malloc(size);//
+	  bzero(bitstring,size);//
    // cpmv(bitstring, size ,pos,sizeof(size_t));//
     cpmv(bitstring, msg_type ,pos,M_TYPE);
     cpmv(bitstring, buff_len ,pos,M_SIZE);
@@ -179,7 +179,7 @@ void process_pwd(char* directory,int fd)
 
     send_message(fd,size,bitstring);
 
-	free(bitstring);
+	  free(bitstring);
 
 }
 
@@ -192,41 +192,41 @@ void process_ls(int fd)
 	int pos=0;
 	size_t bitstring_size=M_TYPE + M_SIZE; // msg type + elem_count
  	FILE *fp;
-  	char temp[128];
-  	bzero(temp,128);
-  
-  	fp = popen("ls", "r");
-  	if (fp == NULL) {
-  	  send_error_msg(fd,OUT_OF_MEMORY_ERROR);
-  	}
-    else { 
+  char temp[128];
+  bzero(temp,128);
+
+  fp = popen("ls", "r");
+  if (fp == NULL) {
+  	    send_error_msg(fd,OUT_OF_MEMORY_ERROR);
+  }
+  else {
   	    while (fgets(temp, sizeof(temp)-1, fp) != NULL) {
 		    elements[elem_count].item = (char*)malloc( strlen(temp) );
 		    elements[elem_count].size = strlen( temp) -1 ;
 		    memcpy(elements[elem_count].item,temp,elements[elem_count].size);
 		    bitstring_size += elements[elem_count].size + M_SIZE;
 		    elem_count++;
-	    }
+	      }
 
-	    pclose(fp);
+	      pclose(fp);
 
-	    uint8_t *bitstring= malloc(bitstring_size);
-	    bzero(bitstring,bitstring_size);
+	      uint8_t *bitstring= malloc(bitstring_size);
+	      bzero(bitstring,bitstring_size);
         cpmv(bitstring, msg_type ,pos,M_TYPE);
         cpmv(bitstring, elem_count ,pos,M_SIZE);
 
-	    for(i=0; i < elem_count ; ++i){
+	      for(i=0; i < elem_count ; ++i){
             cpmv(bitstring, elements[i].size ,pos,M_SIZE);
             cpmv(bitstring, *elements[i].item ,pos,elements[i].size);
-		    free(elements[i].item);
-	    } 
+		        free(elements[i].item);
+	      }
 
         send_message(fd,bitstring_size,bitstring);
         free(bitstring);
     }
-    free(elements);
+  free(elements);
 
-} 
+}
 
 void process_cd(char* directory,uint8_t *buffer, int fd){
 
@@ -235,17 +235,17 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
     int flag=0;
     memcpy(&string_size,buffer+pos,C_SIZE);
     pos+=C_SIZE;
-  
+
     char directory_buff[BUFF_SIZE];
-	bzero(directory_buff,BUFF_SIZE);
+	  bzero(directory_buff,BUFF_SIZE);
     getcwd(directory_buff,BUFF_SIZE-1);
     char parameter[string_size];
     memset(parameter,0,string_size);
     memcpy(parameter,buffer+pos,string_size-1);
-   
+
 
     if( !strcmp(parameter,"..")  && !strcmp(directory_buff,directory) ) //cd .. w katalogu root
-           flag=PREMISSION_ERROR;
+            flag=PREMISSION_ERROR;
     else if ( !strcmp(parameter,"/") || !strcmp(parameter,"~")){
             flag=CH_DIR;
             chdir(directory);
@@ -256,19 +256,19 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
     else {
            if( chdir(parameter) ){ //fail chdir
 
-                flag=EXIST_ERROR;          
+                flag=EXIST_ERROR;
 
            } else { // no failed
                 bzero(directory_buff,BUFF_SIZE);
-                getcwd(directory_buff,BUFF_SIZE-1);       
+                getcwd(directory_buff,BUFF_SIZE-1);
                 if( !strncmp( directory, directory_buff , strlen(directory)) )  // chdir zawiera sciezke roota
-                        flag=CH_DIR;             
+                        flag=CH_DIR;
                 else{
                         flag=PREMISSION_ERROR;     //chdir nie zawiera sciazki roota
                         chdir(directory);
                 }
            }
-           
+
     }
 
     if(flag==CH_DIR){
@@ -279,6 +279,6 @@ void process_cd(char* directory,uint8_t *buffer, int fd){
           send_error_msg(fd, PREMISSION_ERROR);
     }
 
- 
+
 
 }
